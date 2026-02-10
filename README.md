@@ -117,7 +117,7 @@ it’s because it’s **explicitly optimizing for robustness**.
 │   ├── narratives.py         # tiny narrative model
 │   ├── plot_results.py       # plotting utilities
 │   └── rl_agents.py          # tiny PPO/SAC-style learners (NumPy only)
-├── compare_agents_v3.py      # multi-episode benchmark harness (CLI)
+├── compare_agents.py      # multi-episode benchmark harness (CLI)
 ├── requirements.txt
 └── plots/                    # generated figures
 ```
