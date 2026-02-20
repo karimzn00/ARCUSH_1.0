@@ -1,4 +1,3 @@
-# arcus/harness_rl/compare.py
 from __future__ import annotations
 
 import argparse
@@ -9,10 +8,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-
-# -----------------------------
-# IO helpers
-# -----------------------------
 
 def _load_eval_csv(run_root: Path) -> pd.DataFrame:
     p = run_root / "eval" / "eval_results.csv"
@@ -43,7 +38,7 @@ def _flatten_cols(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _is_single_run_root(root: Path) -> bool:
-    # single run has eval/eval_results.csv
+
     return (root / "eval" / "eval_results.csv").exists()
 
 
@@ -53,10 +48,8 @@ def _discover_runs(root: Path) -> List[Path]:
     """
     runs: List[Path] = []
     for p in root.rglob("eval/eval_results.csv"):
-        # p = .../<RUN>/eval/eval_results.csv
         run_dir = p.parent.parent
         runs.append(run_dir)
-    # de-dup, stable order
     uniq = []
     seen = set()
     for r in sorted(runs):
@@ -66,10 +59,6 @@ def _discover_runs(root: Path) -> List[Path]:
     return uniq
 
 
-# -----------------------------
-# Aggregation + normalization
-# -----------------------------
-
 def _aggregate_eval(df: pd.DataFrame) -> pd.DataFrame:
     group_cols = ["env", "algo", "schedule", "eval_mode"]
     metric_cols = [c for c in df.columns if c not in group_cols and c not in ("seed", "run_dir")]
@@ -77,8 +66,6 @@ def _aggregate_eval(df: pd.DataFrame) -> pd.DataFrame:
     agg = df.groupby(group_cols)[metric_cols].agg(["mean", "std"]).reset_index()
     agg = _flatten_cols(agg)
 
-    # convenience short column names
-    # (keep the existing names too)
     if "reward_mean__mean" in agg.columns:
         agg["reward_mean"] = agg["reward_mean__mean"]
     if "identity_mean__mean" in agg.columns:
@@ -107,7 +94,6 @@ def _add_reward_norm(agg: pd.DataFrame) -> pd.DataFrame:
         xmin = float(np.nanmin(x))
         xmax = float(np.nanmax(x))
         if not np.isfinite(xmin) or not np.isfinite(xmax) or abs(xmax - xmin) < 1e-12:
-            # all equal => neutral 0.5
             return pd.Series(np.full(len(g), 0.5), index=g.index)
 
         y = (x - xmin) / (xmax - xmin)
@@ -142,15 +128,10 @@ def _add_leaderboard_score(agg: pd.DataFrame) -> pd.DataFrame:
     return agg
 
 
-# -----------------------------
-# Plotting
-# -----------------------------
-
 def _make_single_run_plots(run_root: Path, agg: pd.DataFrame):
     plots_dir = run_root / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
 
-    # identity by schedule
     if "identity_mean__mean" in agg.columns:
         for eval_mode in sorted(agg["eval_mode"].unique().tolist()):
             sub = agg[agg["eval_mode"] == eval_mode].copy()
@@ -164,7 +145,6 @@ def _make_single_run_plots(run_root: Path, agg: pd.DataFrame):
             plt.savefig(plots_dir / f"identity_by_schedule_{eval_mode}.png")
             plt.close()
 
-    # reward by schedule
     if "reward_mean__mean" in agg.columns:
         for eval_mode in sorted(agg["eval_mode"].unique().tolist()):
             sub = agg[agg["eval_mode"] == eval_mode].copy()
@@ -193,13 +173,11 @@ def _make_leaderboard_curves(root: Path, per_ep_all: pd.DataFrame):
         print(f"[WARN] per_episode.csv missing columns: {missing} -> skipping curve plots")
         return
 
-    # Ensure numeric
     per_ep_all = per_ep_all.copy()
     per_ep_all["episode_idx"] = pd.to_numeric(per_ep_all["episode_idx"], errors="coerce")
     per_ep_all["identity"] = pd.to_numeric(per_ep_all["identity"], errors="coerce")
     per_ep_all["episode_return"] = pd.to_numeric(per_ep_all["episode_return"], errors="coerce")
 
-    # group for plots
     envs = sorted(per_ep_all["env"].dropna().unique().tolist())
     schedules = sorted(per_ep_all["schedule"].dropna().unique().tolist())
     eval_modes = sorted(per_ep_all["eval_mode"].dropna().unique().tolist())
@@ -215,7 +193,6 @@ def _make_leaderboard_curves(root: Path, per_ep_all: pd.DataFrame):
                 if sub.empty:
                     continue
 
-                # mean across seeds for each algo at each episode
                 g = (
                     sub.groupby(["algo", "episode_idx"], dropna=True)[["identity", "episode_return"]]
                     .mean()
@@ -225,7 +202,6 @@ def _make_leaderboard_curves(root: Path, per_ep_all: pd.DataFrame):
 
                 algos = sorted(g["algo"].dropna().unique().tolist())
 
-                # ----- identity curves -----
                 plt.figure()
                 for algo in algos:
                     gg = g[g["algo"] == algo]
@@ -238,7 +214,6 @@ def _make_leaderboard_curves(root: Path, per_ep_all: pd.DataFrame):
                 plt.savefig(plots_dir / f"identity_curve__{env}__{schedule}__{eval_mode}.png")
                 plt.close()
 
-                # ----- reward curves -----
                 plt.figure()
                 for algo in algos:
                     gg = g[g["algo"] == algo]
@@ -252,9 +227,6 @@ def _make_leaderboard_curves(root: Path, per_ep_all: pd.DataFrame):
                 plt.close()
 
 
-# -----------------------------
-# Main
-# -----------------------------
 
 def main():
     ap = argparse.ArgumentParser()
@@ -263,7 +235,6 @@ def main():
     ap.add_argument("--write_csv", action="store_true")
     ap.add_argument("--plots", action="store_true")
 
-    # leaderboard behavior (auto if root is not a single run)
     ap.add_argument("--leaderboard", action="store_true", help="Force multi-run leaderboard mode even if root looks like a single run.")
     args = ap.parse_args()
 
@@ -275,7 +246,6 @@ def main():
     single_run = _is_single_run_root(root) and (not args.leaderboard)
 
     if single_run:
-        # ---------------- single run ----------------
         df = _load_eval_csv(root)
 
         group_cols = ["env", "algo", "schedule", "eval_mode"]
@@ -309,7 +279,6 @@ def main():
 
         return
 
-    # ---------------- multi-run leaderboard ----------------
     runs = _discover_runs(root)
     if not runs:
         raise FileNotFoundError(f"No runs found under {root} (expected **/eval/eval_results.csv).")
@@ -340,8 +309,6 @@ def main():
     agg = _aggregate_eval(df_all)
     agg = _add_reward_norm(agg)
     agg = _add_leaderboard_score(agg)
-
-    # Sort leaderboard: best first
     agg_sorted = agg.sort_values(["env", "schedule", "eval_mode", "leaderboard_score"], ascending=[True, True, True, False])
 
     if args.write_csv:
@@ -363,7 +330,7 @@ def main():
             "reward_norm",
         ] if c in agg_sorted.columns]
         print("\n=== LEADERBOARD (TOP ROWS PER ENV/SCHEDULE/EVAL_MODE) ===")
-        # show top 5 per (env,schedule,eval_mode)
+
         shown = (
             agg_sorted.groupby(["env", "schedule", "eval_mode"], dropna=False)
             .head(5)[cols]
@@ -377,7 +344,6 @@ def main():
     elif args.plots:
         print("[WARN] no per_episode.csv found under runs -> skipping curve plots")
 
-    # also write a compact “stats-like” file for convenience
     if args.write_csv:
         out_stats = root / "leaderboard_stats.csv"
         agg_sorted.to_csv(out_stats, index=False)
