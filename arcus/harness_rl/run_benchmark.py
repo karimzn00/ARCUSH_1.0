@@ -1,4 +1,3 @@
-# arcus/harness_rl/run_benchmark.py
 from __future__ import annotations
 
 import argparse
@@ -44,7 +43,6 @@ def main() -> None:
     ap.add_argument("--algos", default="ppo")
     ap.add_argument("--timesteps", type=int, default=100_000)
 
-    # allow either --seed or --seeds
     ap.add_argument("--seed", type=int, default=None)
     ap.add_argument("--seeds", default="0-9")
 
@@ -54,7 +52,6 @@ def main() -> None:
     ap.add_argument("--log_interval", type=int, default=10)
     ap.add_argument("--progress_bar", action="store_true")
 
-    # eval/compare parameters (forwarded)
     ap.add_argument("--episodes", type=int, default=120)
     ap.add_argument("--both", action="store_true")
     ap.add_argument("--workers", type=int, default=1)
@@ -68,18 +65,15 @@ def main() -> None:
     ap.add_argument("--collapse_streak_post", type=int, default=2)
     ap.add_argument("--collapse_use_components", action="store_true")
 
-    # pipeline switches
     ap.add_argument("--skip_train", action="store_true")
     ap.add_argument("--skip_eval", action="store_true")
     ap.add_argument("--skip_compare", action="store_true")
 
-    # compare options
     ap.add_argument("--compare_print", action="store_true")
     ap.add_argument("--infer_action_space", action="store_true")
     ap.add_argument("--plots", action="store_true")
     ap.add_argument("--write_csv", action="store_true")
 
-    # optional suite outputs (if your compare supports them)
     ap.add_argument("--csv", default=None)
     ap.add_argument("--plots_dir", default=None)
     ap.add_argument("--suite_write_csv", action="store_true")
@@ -100,7 +94,6 @@ def main() -> None:
 
     run_id = args.run_id
     if not run_id:
-        # keep same style you already use
         from datetime import datetime
         run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
 
@@ -114,9 +107,6 @@ def main() -> None:
             run_dir = out_root / f"bench_{env_id}_{algo}_{run_id}"
             ensure_dir(run_dir)
 
-            # ----------------
-            # TRAIN
-            # ----------------
             if not args.skip_train:
                 for seed in seeds:
                     seed_dir = run_dir / f"seed_{seed}"
@@ -128,16 +118,13 @@ def main() -> None:
                         "--algo", algo,
                         "--timesteps", str(args.timesteps),
                         "--seed", str(seed),
-                        "--out_dir", str(seed_dir),          # ✅ FIX (was out_root/run_id)
+                        "--out_dir", str(seed_dir),
                         "--run_id", "train_none",
                         "--device", str(args.device),
                         "--log_interval", str(args.log_interval),
                     ]
                     run_cmd(cmd_train)
 
-            # ----------------
-            # EVAL
-            # ----------------
             if not args.skip_eval:
                 cmd_eval = [
                     "python", "-m", "arcus.harness_rl.run_eval",
@@ -162,9 +149,6 @@ def main() -> None:
                     cmd_eval.append("--collapse_use_components")
                 run_cmd(cmd_eval)
 
-            # ----------------
-            # COMPARE
-            # ----------------
             if not args.skip_compare:
                 cmd_cmp = [
                     "python", "-m", "arcus.harness_rl.compare",
