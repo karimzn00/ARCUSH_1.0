@@ -10,11 +10,6 @@ import numpy as np
 
 ArrayLike = Union[np.ndarray, Iterable[float]]
 
-
-# ----------------------------
-# Numeric safety helpers
-# ----------------------------
-
 def _finite_float(x: Any, default: float = 0.0) -> float:
     try:
         v = float(x)
@@ -37,11 +32,6 @@ def _sigmoid(x: float) -> float:
         return 1.0 / (1.0 + z)
     z = math.exp(x)
     return z / (1.0 + z)
-
-
-# ----------------------------
-# Weights / state
-# ----------------------------
 
 @dataclass
 class IdentityWeights:
@@ -80,10 +70,6 @@ class IdentityState:
     anchor_count: int = 0
 
 
-# ----------------------------
-# Competence
-# ----------------------------
-
 def update_reward_ema(state: IdentityState, episode_return: float) -> None:
     a = _finite_float(state.reward_ema_alpha, default=0.05)
     a = float(np.clip(a, 0.0, 1.0))
@@ -108,10 +94,6 @@ def competence_from_reward(
     x = (er - re) / rs
     return _finite01(_sigmoid(6.0 * x), default=0.5)
 
-
-# ----------------------------
-# Coherence (within-episode)
-# ----------------------------
 
 def coherence_from_actions(actions: Iterable[Any]) -> float:
     acts = list(actions)
@@ -143,9 +125,7 @@ def coherence_from_actions(actions: Iterable[Any]) -> float:
         return 0.5
 
 
-# ----------------------------
-# Behavior signature
-# ----------------------------
+
 
 def behavior_signature_from_episode(
     actions: Iterable[Any],
@@ -194,9 +174,6 @@ def behavior_signature_from_episode(
     return np.nan_to_num(sig, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
 
 
-# ----------------------------
-# Continuity (local)
-# ----------------------------
 
 def continuity_from_behavior_signature(
     prev_sig: Optional[np.ndarray],
@@ -230,9 +207,6 @@ def continuity_from_behavior_signature(
     return _finite01(cont, default=0.5), cur
 
 
-# ----------------------------
-# Integrity (baseline fidelity)
-# ----------------------------
 
 def _anchor_update_mean(prev_anchor: Optional[np.ndarray], new_sig: np.ndarray, k: int) -> np.ndarray:
     x = np.asarray(new_sig, dtype=np.float32).reshape(-1)
@@ -315,9 +289,6 @@ def meaning_from_violations(
     return _finite01(v_part * r_part, default=1.0)
 
 
-# ----------------------------
-# Final identity score
-# ----------------------------
 
 def identity_score(
     competence: float,
@@ -345,9 +316,6 @@ def identity_score(
     return _finite01(s, default=0.5)
 
 
-# ----------------------------
-# High-level tracker
-# ----------------------------
 
 @dataclass
 class IdentityTracker:
@@ -421,9 +389,6 @@ class IdentityTracker:
         }
 
 
-# ----------------------------
-# JSONL helpers (kept here, but FIXED)
-# ----------------------------
 
 @dataclass
 class EpisodeLog:
