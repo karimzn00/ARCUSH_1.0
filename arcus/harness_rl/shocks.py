@@ -1,4 +1,3 @@
-# arcus/harness_rl/shocks.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -7,7 +6,7 @@ import numpy as np
 
 try:
     import gymnasium as gym
-except Exception:  # pragma: no cover
+except Exception:
     import gym
 
 
@@ -74,7 +73,7 @@ class ShockWrapper(gym.Wrapper):
         obs_sigma: float = 0.05,
         betray_p: float = 0.35,
         scarcity_action_scale: float = 0.5,
-        reward_scale_in_shock: float = 1.0,   # keep 1.0 by default to avoid "reward-only" framing
+        reward_scale_in_shock: float = 1.0,
         reward_bias_in_shock: float = 0.0,
     ):
         super().__init__(env)
@@ -102,19 +101,16 @@ class ShockWrapper(gym.Wrapper):
     def reset(self, **kwargs):
         self._t = 0
         obs, info = self.env.reset(**kwargs)
-        obs = self._shock_obs(obs, force_tag="none")  # no shock on reset
+        obs = self._shock_obs(obs, force_tag="none")
         return obs, info
 
     def step(self, action):
-        # Dynamics shock = modify action before stepping
         a = self._shock_action(action)
 
         obs, reward, terminated, truncated, info = self.env.step(a)
 
-        # Observation shock = perturb/transform observation
         obs = self._shock_obs(obs)
 
-        # Reward shock = optional (default neutral)
         reward = self._shock_reward(reward)
 
         self._t += 1
@@ -128,26 +124,20 @@ class ShockWrapper(gym.Wrapper):
         if not self.in_shock:
             return action
 
-        # Convert to np array for safe ops, then back to original type
         a = np.array(action, dtype=np.float32)
 
         if self.mode == "invert":
-            a = -a  # flip policy effect on dynamics
+            a = -a
         elif self.mode == "betrayal":
-            # with some probability, "betray" by flipping sign or injecting noise
             if self._rng.random() < self.betray_p:
                 if self._rng.random() < 0.5:
                     a = -a
                 else:
                     a = a + self._rng.normal(0.0, 0.25, size=a.shape).astype(np.float32)
         elif self.mode == "scarcity":
-            # damp actions (like reduced actuator authority)
             a = a * self.scarcity_action_scale
-            # also occasional dropout
             if self._rng.random() < 0.15:
                 a = a * 0.0
-
-        # clip if action space has bounds
         if hasattr(self.env, "action_space") and isinstance(self.env.action_space, gym.spaces.Box):
             lo = self.env.action_space.low
             hi = self.env.action_space.high
@@ -165,13 +155,11 @@ class ShockWrapper(gym.Wrapper):
         if self.mode == "invert":
             x = -x
         elif self.mode == "betrayal":
-            # noisy + occasional sign flip on some dims
             x = x + self._rng.normal(0.0, self.obs_sigma, size=x.shape).astype(np.float32)
             if self._rng.random() < 0.25:
                 mask = self._rng.random(size=x.shape) < 0.5
                 x = np.where(mask, -x, x)
         elif self.mode == "scarcity":
-            # quantize / coarsen + noise
             step = 0.05
             x = np.round(x / step) * step
             x = x + self._rng.normal(0.0, self.obs_sigma * 0.75, size=x.shape).astype(np.float32)
@@ -219,7 +207,6 @@ def trajectory_divergence(
     diff_a = np.linalg.norm(A - B, axis=1)
     diff_o = np.linalg.norm(Oa - Ob, axis=1)
 
-    # cosine similarity for actions
     denom = (np.linalg.norm(A, axis=1) * np.linalg.norm(B, axis=1)) + 1e-8
     cos = np.sum(A * B, axis=1) / denom
 
