@@ -27,7 +27,7 @@ def _read_eval_results(paths: List[Tuple[Path, Path]]) -> pd.DataFrame:
     for eval_csv, _per in paths:
         try:
             df = pd.read_csv(eval_csv)
-            df["run_dir"] = str(eval_csv.parents[1])  # .../runs/bench_xxx
+            df["run_dir"] = str(eval_csv.parents[1]) 
             rows.append(df)
         except Exception:
             continue
@@ -79,12 +79,10 @@ def build_leaderboard(eval_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame
 
     df = eval_df.copy()
 
-    # aggregate across seeds
     group = ["env", "algo", "eval_mode", "schedule"]
     metric_cols = [c for c in df.columns if c not in group + ["seed", "run_dir"]]
     agg = df.groupby(group)[metric_cols].mean(numeric_only=True).reset_index()
 
-    # normalize reward per env+schedule+eval_mode across algos
     if "reward_mean" in agg.columns:
         agg = _minmax_norm_group(
             agg,
@@ -95,7 +93,6 @@ def build_leaderboard(eval_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame
     else:
         agg["reward_norm"] = np.nan
 
-    # robustness view uses stress schedules only
     stress_df = agg[agg["schedule"].astype(str).str.lower().isin(
         ["resource_constraint", "trust_violation", "valence_inversion"]
     )].copy()
@@ -104,7 +101,6 @@ def build_leaderboard(eval_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame
         if col not in stress_df.columns:
             stress_df[col] = np.nan
 
-    # score weights: identity primary
     stress_df["robust_score"] = (
         0.55 * stress_df["identity_mean"].astype(float)
         + 0.30 * (1.0 - stress_df["collapse_rate_shock"].astype(float))
@@ -186,7 +182,6 @@ def main():
     ap.add_argument("--schedules", default="baseline,resource_constraint,trust_violation,valence_inversion",
                     help="Comma-separated schedules to plot")
 
-    # Compatibility flags (your command)
     ap.add_argument("--write_csv", action="store_true", help="Write CSV outputs (default: ON)")
     ap.add_argument("--no_write_csv", action="store_true", help="Disable writing CSV outputs")
     ap.add_argument("--plots", action="store_true", help="Generate curve plots if per_episode exists (default: ON)")
