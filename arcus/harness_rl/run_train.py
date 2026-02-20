@@ -16,20 +16,13 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.utils import set_random_seed
 
 try:
-    # TRPO lives in sb3-contrib
-    from sb3_contrib import TRPO  # type: ignore
+    from sb3_contrib import TRPO
     _HAS_TRPO = True
 except Exception:
-    TRPO = None  # type: ignore
+    TRPO = None
     _HAS_TRPO = False
 
-
-# ----------------------------
-# Helpers
-# ----------------------------
-
 def _sanitize_env(env_id: str) -> str:
-    # Keep compatibility with your run_eval finder logic
     return (
         env_id.replace("-", "")
         .replace("_", "")
@@ -49,15 +42,12 @@ def _set_all_seeds(seed: int) -> None:
 
 
 def _auto_device(device: str) -> str:
-    # SB3 accepts "auto" too, but we keep explicit behavior:
     if device in ("cpu", "cuda", "auto"):
         return device
     return "auto"
 
 
 def _make_env(env_id: str, seed: int, n_envs: int) -> gym.Env:
-    # VecEnv speeds up rollouts (esp. PPO/A2C/TRPO), but keep n_envs=1 default.
-    # For SAC/TD3/DDPG/DQN, VecEnv is fine but doesn't always speed up a ton.
     return make_vec_env(env_id, n_envs=n_envs, seed=seed)
 
 
@@ -91,14 +81,10 @@ def _build_model(algo: str, env, device: str, tb_log: str, verbose: int):
                 "Install it with:\n"
                 "  pip install sb3-contrib"
             )
-        return TRPO("MlpPolicy", **common)  # type: ignore
+        return TRPO("MlpPolicy", **common)
 
     raise ValueError(f"Unsupported algo: {algo}")
 
-
-# ----------------------------
-# Main
-# ----------------------------
 
 def main():
     ap = argparse.ArgumentParser()
@@ -121,21 +107,15 @@ def main():
     out_dir = Path(args.out_dir)
 
     _ensure_dir(out_dir)
-
-    # Set seeds
     _set_all_seeds(seed)
 
-    # Create env
     env = _make_env(env_id, seed=seed, n_envs=max(1, int(args.n_envs)))
 
-    # TensorBoard logs
     tb_log = str(out_dir / args.tb_subdir)
     _ensure_dir(Path(tb_log))
 
-    # Build model
     model = _build_model(algo, env, device=device, tb_log=tb_log, verbose=int(args.verbose))
 
-    # Train with progress bar
     run_name = f"{algo.lower()}_{env_id}_seed{seed}_{int(time.time())}"
     model.learn(
         total_timesteps=timesteps,
@@ -143,12 +123,10 @@ def main():
         tb_log_name=run_name,
     )
 
-    # Save model in a name run_eval already knows how to find
     expected_name = f"{algo.lower()}_{_sanitize_env(env_id)}.zip"
     model_path = out_dir / expected_name
     model.save(str(model_path))
 
-    # Write metadata for traceability
     meta = {
         "env": env_id,
         "algo": algo.lower(),
