@@ -29,7 +29,6 @@ def _parse_seeds(spec: str) -> List[int]:
 
 
 def _thirds_pattern(episodes: int) -> str:
-    # baseline has pre/shock/post windows too (no stress active)
     pre = max(1, episodes // 3)
     shock = max(1, episodes // 3)
     post = max(1, episodes - pre - shock)
@@ -155,12 +154,6 @@ def _episode_rollout(env: gym.Env, model, deterministic: bool, tracker: Identity
 
         done = bool(terminated) or bool(truncated)
         obs = obs2
-
-    # -------- FIX: normalize regret so meaning doesn't saturate to ~0 --------
-    # We want exp(-regret_sum / regret_scale) to be meaningful across envs.
-    # Use a robust scale per episode:
-    # - abs(ep_return) helps in CartPole-like (0..500) and negative-return envs
-    # - ep_len is fallback when returns are near zero
     regret_scale_episode = float(max(1.0, abs(float(ep_return)), float(ep_len)))
 
     old_regret_scale = float(getattr(tracker, "regret_scale", 1.0))
@@ -290,8 +283,6 @@ def main():
                     per_ep.append(rec)
 
                 df_ep = pd.DataFrame(per_ep)
-
-                # per-schedule minmax normalization for curves (within this run)
                 if len(df_ep) and "episode_return" in df_ep.columns:
                     r = df_ep["episode_return"].to_numpy(dtype=float)
                     rmin = float(np.nanmin(r))
@@ -300,8 +291,6 @@ def main():
                         df_ep["reward_norm_episode"] = (df_ep["episode_return"] - rmin) / (rmax - rmin)
                     else:
                         df_ep["reward_norm_episode"] = 0.5
-
-                # ---- compute segment means (from df_ep) ----
                 def _m_mask(col: str, phase: str) -> float:
                     m = df_ep["stress_phase"].astype(str) == phase
                     if not np.any(m):
@@ -324,8 +313,6 @@ def main():
                 shock_tv_intensity = _m_mask("trust_violation_intensity_mean", "shock")
                 if not np.isfinite(shock_tv_intensity):
                     shock_tv_intensity = 0.0
-
-                # ---- compute collapse columns BEFORE any rates ----
                 if args.collapse_use_components and len(df_ep):
                     base_pre = float(identity_pre) if np.isfinite(identity_pre) else float(np.nanmean(df_ep["identity"].to_numpy(dtype=float)))
 
@@ -351,8 +338,6 @@ def main():
                     thr = float(args.collapse_event_threshold)
                     df_ep["collapse_score_episode"] = np.nan
                     df_ep["collapse_event_episode"] = (df_ep["identity"].to_numpy(dtype=float) < thr).astype(int)
-
-                # rates from df_ep masks (no stale slices)
                 def _rate_phase(phase: str) -> float:
                     m = df_ep["stress_phase"].astype(str) == phase
                     if not np.any(m):
@@ -363,8 +348,6 @@ def main():
                 collapse_rate_pre = _rate_phase("pre")
                 collapse_rate_shock = _rate_phase("shock")
                 collapse_rate_post = _rate_phase("post")
-
-                # headline shock score/event from shock means
                 shock_score_mean = collapse_score(
                     meaning=float(meaning_shock if np.isfinite(meaning_shock) else 0.0),
                     integrity=float(integrity_shock if np.isfinite(integrity_shock) else 0.0),
