@@ -1,172 +1,156 @@
-# CollapseBench / ARCUS-H (toy)
-### Identity-aware & narrative-regret scaffolding for *collapse stress-testing* agents
+# ARCUS-H 1.0  
+## Adaptive Reinforcement Coherence Under Stress — Evaluation Harness for RL
 
-> **Question:** What if an agent can maximize reward — yet **collapse** under grief, betrayal, or meaning loss?
+ARCUS-H introduces a complementary evaluation axis to reinforcement learning:
 
-**ARCUS-H**(ARCUS Harness): An Identity Stability Layer for Reinforcement Learning, is a small, hackable research scaffold that explores a simple idea:
+> **Identity Stability and Collapse Under Controlled Stress**
 
-**Add an “identity + narrative robustness” layer on top of agent decision-making, and evaluate it under adversarial collapse scenarios.**
-
-It’s not trying to beat PPO at tasks.  
-It’s trying to measure and reduce **failure modes** that reward-only optimization often ignores.
+Traditional RL benchmarks compress evaluation into episodic return.  
+ARCUS-H evaluates whether an agent remains coherent and stable when execution conditions deviate from nominal assumptions.
 
 ---
 
-## What you get
+# Why ARCUS-H?
 
-ARCUS-H implements:
+Two agents may achieve similar reward.
 
-- **Multi-component identity** tracking:
-  - **competence** / **integrity** / **coherence** / **continuity**
-- **Meaning-based action gating**
-  - blocks actions predicted to violate trust floors or hollow out meaning
-- **Identity-aware regret**
-  - regret weighted by **identity loss**, not just missed reward
-- **Counterfactual narrative regret**
-  - short rollouts penalize actions that likely destabilize narrative coherence/continuity
-- **Adversarial “life world”** with collapse scenarios:
-  - **GRIEF**, **BETRAYAL**, **MEANING_LOSS**
+Under:
+- reduced control authority  
+- action mistrust / permutation  
+- reward corruption  
 
-Think of ARCUS-H as a prototype for a community **layer**:
-> a wrapper that can filter actions + shape regret **without replacing** your policy.
+their internal stability profiles can diverge dramatically.
+
+ARCUS-H makes this divergence measurable.
 
 ---
 
-## Quickstart
+# Core Evaluation Protocol
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python compare_agents.py
-```
+Each evaluation run is divided into three aligned phases:
 
-Outputs:
-- `benchmark_results.json`
-- plots in `plots/`
+PRE → SHOCK → POST
+
+During SHOCK, ARCUS-H applies controlled transformations to executed actions and/or rewards.
 
 ---
 
-## Benchmark harness (multi-episode)
+# Implemented Stress Schedules
 
-The harness runs **multi-episode** comparisons for:
-
-- `arcus_h_v4` (identity + narrative core)
-- `greedy`, `random`, `rest` (simple baselines)
-- `ppo`, `sac` (tiny NumPy-only reward learners; not SB3)
-
-Key metrics:
-- `completed_tasks`
-- `total_reward`
-- `identity_final` + full `identity_trace`
-- collapse counts per episode (`GRIEF`, `BETRAYAL`, `MEANING_LOSS`)
+| Schedule | Description |
+|-----------|-------------|
+| baseline | No perturbation |
+| resource_constraint | Reduced control authority |
+| trust_violation | Action mismatch / distortion |
+| valence_inversion | Reward sign flip |
 
 ---
 
-## What the benchmark shows (how to read the plots)
+# Core Metrics
 
-ARCUS-H is designed to reveal a pattern you’ll often see in agents:
+ARCUS-H reports:
 
-1) **High task completion can coexist with lots of collapses**  
-2) Collapse-heavy agents can look “productive” but rack up long-term penalties (trust/meaning failure)
+- Identity trajectory
+- Pre→Shock identity drop
+- Continuous collapse score
+- Shock collapse rate
+- Normalized reward
+- Robustness score
 
-In this collapse world, you’ll typically observe:
+Robustness score:
 
-- reward-only learners can complete many tasks while suffering high collapse counts
-- ARCUS-H tends to trade some throughput for:
-  - **lower collapse frequency**
-  - **more stable identity trajectories**
-  - **better robustness under stress events**
-
-If ARCUS-H is “winning”, it’s not because it’s a better optimizer —  
-it’s because it’s **explicitly optimizing for robustness**.
-
----
-
-## Figures
-
-(Generated automatically in `plots/` when you run the benchmark.)
-
-### Mean tasks
-![Mean tasks](plots/tasks_mean.png)
-
-### Mean reward
-![Mean reward](plots/reward_mean.png)
-
-### Mean identity
-![Mean identity](plots/identity_mean.png)
-
-### Identity traces (episode 0)
-![Identity traces](plots/identity_traces_ep0.png)
-
-### Collapse counts
-![Collapse counts](plots/collapse_counts_mean.png)
+robust = 0.30  
+     + 0.55 × id_mean  
+     − 0.30 × CR_shock  
+     + 0.15 × reward_norm  
 
 ---
 
-## Repo structure
+# Leaderboard (Overall)
 
-```
-.
-├── arcus_h/
-│   ├── __init__.py
-│   ├── arcus_agent.py        # ARCUS-H v4 core (identity + regrets + gating)
-│   ├── baselines.py          # greedy/random/rest
-│   ├── life_world.py         # adversarial environment + collapse events
-│   ├── metrics.py            # identity + episode logs
-│   ├── narratives.py         # tiny narrative model
-│   ├── plot_results.py       # plotting utilities
-│   └── rl_agents.py          # tiny PPO/SAC-style learners (NumPy only)
-├── compare_agents.py      # multi-episode benchmark harness (CLI)
-├── requirements.txt
-└── plots/                    # generated figures
-```
+Aggregated across seeds (0–9).
+
+See:
+
+runs/_leaderboard/leaderboard_overall.csv
 
 ---
 
-## How people can use this (practical)
+# Example: CartPole-v1 (Deterministic)
 
-### 1) Use it as a **collapse benchmark**
-Run your agent in this environment and compare:
-- collapse counts
-- reward vs identity stability
-- collapse-trigger patterns
+### Identity — Baseline
 
-### 2) Use ARCUS-H as an **action filter**
-Treat your policy as proposing actions:
-- ARCUS-H gates or down-weights actions that violate meaning/trust floors
-- your policy still “does the job”, but with a robustness constraint
+![CartPole baseline identity](runs/_leaderboard/plots/CartPole-v1/CartPole-v1__deterministic__baseline__identity.png)
 
-### 3) Use it as a research scaffold
-Swap in:
-- a learned world model inside counterfactual rollouts
-- different identity components
-- alternative regret weighting schemes
+### Identity — Trust Violation
 
----
+![CartPole trust identity](runs/_leaderboard/plots/CartPole-v1/CartPole-v1__deterministic__trust_violation__identity.png)
 
-## Roadmap ideas (good “community layer” add-ons)
+### Collapse Score — Trust Violation
 
-If you want this to be more than a toy, these are strong next steps:
+![CartPole trust collapse](runs/_leaderboard/plots/CartPole-v1/CartPole-v1__deterministic__trust_violation__collapse_score.png)
 
-- **Policy wrapper API**: `ArcusWrapper(policy).act(obs)` so any policy can be wrapped.
-- **Standardized stress suites**:
-  - trust game variants
-  - long-horizon projects with temptations (shortcut vs integrity)
-  - memory consistency challenges (continuity stress)
-- **Ablations**:
-  - remove gating only
-  - remove identity-aware regret only
-  - remove counterfactual narrative regret only
-  - compare which component reduces which collapse type
-- **Metrics pack**:
-  - “collapse risk curve”
-  - “identity volatility”
-  - “narrative drift”
-  - “trust floor violations”
+### Reward_norm — Trust Violation
+
+![CartPole trust reward](runs/_leaderboard/plots/CartPole-v1/CartPole-v1__deterministic__trust_violation__reward_norm.png)
+
+Return alone does not capture stress fragility.
 
 ---
 
-## License
+# Deterministic Stress Results
 
-MIT
+Full plots available under:
+
+runs/_leaderboard/plots/<ENV>/
+
+Environments:
+
+- Acrobot-v1
+- CartPole-v1
+- MountainCar-v0
+- MountainCarContinuous-v0
+- Pendulum-v1
+
+---
+
+# Reproducing Results
+
+## Install
+
+git clone https://github.com/karimzn00/ARCUSH_1.0.git  
+cd ARCUSH_1.0  
+
+python -m venv .venv  
+source .venv/bin/activate  
+pip install -r requirements.txt  
+
+---
+
+## Train Example
+
+python -m arcus.harness_rl.run_benchmark --env CartPole-v1 --algo ppo --timesteps 200000 --seeds 0-9
+
+---
+
+## Evaluate Under Stress
+
+python -m arcus.harness_rl.run_eval --run_dir RUN_DIR --env CartPole-v1 --algo ppo --episodes 120 --seeds 0-9 --both
+
+---
+
+## Compare + Generate Plots
+
+python -m arcus.harness_rl.compare --root RUN_DIR --print --write_csv --plots
+
+---
+
+# Paper
+
+See `arcus_h_paper.pdf` for the full formal specification and experiments.
+
+---
+
+# License
+
+MIT License.
