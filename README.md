@@ -1,153 +1,245 @@
-# ARCUS-H 1.0  
-## Adaptive Reinforcement Coherence Under Stress — Evaluation Harness for RL
+# ARCUS-H 1.0
+## Adaptive Reinforcement Coherence Under Stress
+### Open Benchmark for Identity Stability in Reinforcement Learning
 
-ARCUS-H introduces a complementary evaluation axis to reinforcement learning:
+ARCUS-H is an open-source evaluation harness that adds a second axis to RL benchmarking:
 
-> **Identity Stability and Collapse Under Controlled Stress**
+> **Stability under structured stress** — not just reward.
 
-Traditional RL benchmarks compress evaluation into episodic return.  
-ARCUS-H evaluates whether an agent remains coherent and stable when execution conditions deviate from nominal assumptions.
+Traditional benchmarks optimize:
+\[
+J(\pi) = \mathbb{E}\left[\sum_{t=0}^{T} \gamma^t r_t\right]
+\]
 
----
-
-# Why ARCUS-H?
-
-Two agents may achieve similar reward.
-
-Under:
-- reduced control authority  
-- action mistrust / permutation  
-- reward corruption  
-
-their internal stability profiles can diverge dramatically.
-
-ARCUS-H makes this divergence measurable.
+ARCUS-H evaluates whether an agent remains coherent when execution conditions deviate from nominal assumptions.
 
 ---
 
-# Core Evaluation Protocol
+# Evaluation Structure
 
-Each evaluation run is divided into three aligned phases:
+Each episode is divided into:
 
-PRE → SHOCK → POST
+\[
+\textbf{PRE} \rightarrow \textbf{SHOCK} \rightarrow \textbf{POST}
+\]
 
-During SHOCK, ARCUS-H applies controlled transformations to executed actions and/or rewards.
+Let:
 
----
+- \( \mathcal{T}_{pre} \)
+- \( \mathcal{T}_{shock} \)
+- \( \mathcal{T}_{post} \)
 
-# Implemented Stress Schedules
-
-| Schedule | Description |
-|-----------|-------------|
-| baseline | No perturbation |
-| resource_constraint | Reduced control authority |
-| trust_violation | Action mismatch / distortion |
-| valence_inversion | Reward sign flip |
+During SHOCK, action or reward is modified.
 
 ---
 
-# Core Metrics
+# Stress Models
 
-ARCUS-H reports:
+## 1️⃣ Resource Constraint
 
-- Identity trajectory
-- Pre→Shock identity drop
-- Continuous collapse score
-- Shock collapse rate
-- Normalized reward
-- Robustness score
+Continuous:
+\[
+a_t^{exec} = \alpha a_t, \quad 0 < \alpha < 1
+\]
 
-Robustness score:
-
-robust = 0.30  
-     + 0.55 × id_mean  
-     − 0.30 × CR_shock  
-     + 0.15 × reward_norm  
+Discrete:
+\[
+a_t^{exec} = a_t \quad \text{with probability } p, \text{ else noop}
+\]
 
 ---
 
-# Leaderboard (Overall)
+## 2️⃣ Trust Violation
 
-Aggregated across seeds (0–9).
+Continuous distortion:
+\[
+a_t^{exec} = a_t + \epsilon, \quad \epsilon \sim \mathcal{N}(0,\sigma^2)
+\]
 
-See:
-
-runs/_leaderboard/leaderboard_overall.csv
-
----
-
-# Example: CartPole-v1 (Deterministic)
-
-### Identity — Baseline
-
-![CartPole baseline identity](runs/_leaderboard/plots/CartPole-v1/CartPole-v1__deterministic__baseline__identity.png)
-
-### Identity — Trust Violation
-
-![CartPole trust identity](runs/_leaderboard/plots/CartPole-v1/CartPole-v1__deterministic__trust_violation__identity.png)
-
-### Collapse Score — Trust Violation
-
-![CartPole trust collapse](runs/_leaderboard/plots/CartPole-v1/CartPole-v1__deterministic__trust_violation__collapse_score.png)
-
-### Reward_norm — Trust Violation
-
-![CartPole trust reward](runs/_leaderboard/plots/CartPole-v1/CartPole-v1__deterministic__trust_violation__reward_norm.png)
-
-Return alone does not capture stress fragility.
+Discrete permutation:
+\[
+a_t^{exec} = P(a_t)
+\]
 
 ---
 
-# Deterministic Stress Results
+## 3️⃣ Valence Inversion
 
-Full plots available under:
+Reward flip:
+\[
+r_t^{exec} = -r_t
+\]
 
-runs/_leaderboard/plots/<ENV>/
-
-Environments:
-
-- Acrobot-v1
-- CartPole-v1
-- MountainCar-v0
-- MountainCarContinuous-v0
-- Pendulum-v1
+or affine distortion:
+\[
+r_t^{exec} = \lambda r_t + b
+\]
 
 ---
 
-# Reproducing Results
+# Identity & Collapse Metrics
+
+## Phase Means
+
+\[
+\mu_{pre}(X) = \frac{1}{|\mathcal{T}_{pre}|} \sum_{t \in \mathcal{T}_{pre}} X_t
+\]
+
+\[
+\mu_{shock}(X) = \frac{1}{|\mathcal{T}_{shock}|} \sum_{t \in \mathcal{T}_{shock}} X_t
+\]
+
+Pre→Shock drop:
+
+\[
+\Delta_X = \mu_{pre}(X) - \mu_{shock}(X)
+\]
+
+---
+
+## Collapse Score
+
+Deficits:
+
+\[
+d^m_t = \max(0, \tau_m - m_t)
+\]
+\[
+d^i_t = \max(0, \tau_i - i_t)
+\]
+\[
+d^{id}_t = \max(0, d^{id}_t - \tau_{id})
+\]
+
+Weighted mass:
+
+\[
+raw_t = w_m d^m_t + w_i d^i_t + w_{id} d^{id}_t + w_u u_t
+\]
+
+Smooth normalization:
+
+\[
+raw^{(n)}_t = \frac{raw_t}{raw_t + 1}
+\]
+
+Sigmoid collapse:
+
+\[
+S_t = \sigma(\beta(raw^{(n)}_t - \gamma))
+\]
+
+Shock collapse rate:
+
+\[
+CR_{shock} = \frac{1}{|\mathcal{T}_{shock}|} \sum_{t \in \mathcal{T}_{shock}} \mathbf{1}[S_t > \eta]
+\]
+
+---
+
+# Robustness Score
+
+\[
+\text{robust} = 0.30 + 0.55 \cdot id_{mean} - 0.30 \cdot CR_{shock} + 0.15 \cdot rwd_{norm}
+\]
+
+All components are reported separately.
+
+---
+
+# Environments Included
+
+- CartPole-v1  
+- Acrobot-v1  
+- MountainCar-v0  
+- MountainCarContinuous-v0  
+- Pendulum-v1  
+
+Supports both discrete and continuous action spaces.
+
+---
+
+# Sample Leaderboard (Extract)
+
+From `leaderboard_overall.csv`:
+
+| Algo | Mode | Robust | Identity | CR_shock | Reward_norm |
+|------|------|--------|----------|----------|-------------|
+| td3 | stochastic | 0.8079 | 0.6840 | 0.0542 | 0.9863 |
+| ddpg | stochastic | 0.8034 | 0.6704 | 0.0500 | 0.9978 |
+| trpo | deterministic | 0.7870 | 0.7283 | 0.0687 | 0.7136 |
+
+Full CSV inside:
+
+```
+runs/_leaderboard/
+```
+
+---
+
+# Example Stress Trajectories
+
+### CartPole — Trust Violation
+
+Identity:
+![identity](runs/_leaderboard/plots/CartPole-v1/CartPole-v1__deterministic__trust_violation__identity.png)
+
+Collapse Score:
+![collapse](runs/_leaderboard/plots/CartPole-v1/CartPole-v1__deterministic__trust_violation__collapse_score.png)
+
+Reward Norm:
+![reward](runs/_leaderboard/plots/CartPole-v1/CartPole-v1__deterministic__trust_violation__reward_norm.png)
+
+Reward may remain high while identity destabilizes.
+
+---
+
+# Reproducibility
 
 ## Install
 
-git clone https://github.com/karimzn00/ARCUSH_1.0.git  
-cd ARCUSH_1.0  
+```bash
+git clone https://github.com/karimzn00/ARCUSH_1.0.git
+cd ARCUSH_1.0
 
-python -m venv .venv  
-source .venv/bin/activate  
-pip install -r requirements.txt  
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
 ---
 
-## Train Example
+## Train
 
-python -m arcus.harness_rl.run_benchmark --env CartPole-v1 --algo ppo --timesteps 200000 --seeds 0-9
+```bash
+python -m arcus.harness_rl.run_benchmark   --env CartPole-v1   --algo ppo   --timesteps 200000   --seeds 0-9
+```
 
 ---
 
 ## Evaluate Under Stress
 
-python -m arcus.harness_rl.run_eval --run_dir RUN_DIR --env CartPole-v1 --algo ppo --episodes 120 --seeds 0-9 --both
+```bash
+python -m arcus.harness_rl.run_eval   --run_dir RUN_DIR   --env CartPole-v1   --algo ppo   --episodes 120   --seeds 0-9   --both
+```
 
 ---
 
-## Compare + Generate Plots
+## Generate Leaderboard + Plots
 
-python -m arcus.harness_rl.compare --root RUN_DIR --print --write_csv --plots
+```bash
+python -m arcus.harness_rl.compare   --root RUN_DIR   --print   --write_csv   --plots
+```
 
 ---
 
-# Paper
+# Research Direction
 
-See `arcus_h_paper.pdf` for the full formal specification and experiments.
+ARCUS-H aims to evolve into:
+
+- A stability benchmark across RL algorithms
+- A robustness diagnostic layer
+- A structured stress test for policy reliability
 
 ---
 
