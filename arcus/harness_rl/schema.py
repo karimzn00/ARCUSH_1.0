@@ -4,7 +4,6 @@ from typing import Dict, Any, Optional
 
 SCHEMA_VERSION = "1.0"
 
-# Canonical keys for every JSONL row (episode-level)
 STANDARD_KEYS = [
     "schema_version",
     "run_id",
@@ -35,14 +34,12 @@ def normalize_row(row: Dict[str, Any], *, defaults: Optional[Dict[str, Any]] = N
     out = dict(defaults)
     out.update(row)
     out["schema_version"] = SCHEMA_VERSION
-    # Back-compat aliases
     if "collapse" in out and "collapsed" not in out:
         out["collapsed"] = bool(out["collapse"])
     if "identity" in out and "stability" not in out:
         out["stability"] = float(out["identity"])
     if "episode" not in out and "ep" in out:
         out["episode"] = int(out["ep"])
-    # Fill missing canonical keys with None
     for k in STANDARD_KEYS:
         out.setdefault(k, None)
     return out
