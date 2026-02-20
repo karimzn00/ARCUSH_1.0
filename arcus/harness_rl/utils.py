@@ -9,7 +9,7 @@ import numpy as np
 
 try:
     import torch
-except Exception:  # pragma: no cover
+except Exception:
     torch = None
 
 
