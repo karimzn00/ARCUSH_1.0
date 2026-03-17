@@ -1,9 +1,3 @@
-# arcus/core/logio.py
-"""
-Single source of truth for EpisodeLog.
-Do NOT redefine EpisodeLog in identity.py or anywhere else.
-Import from here everywhere.
-"""
 from __future__ import annotations
 
 import json
@@ -14,24 +8,23 @@ from typing import Any, Dict, Iterable
 
 @dataclass
 class EpisodeLog:
-    # --- required: identify the episode unambiguously ---
     episode: int
-    phase: str                  # "pre" | "shock" | "post"
-    stress: str                 # stressor name e.g. "trust_violation"
-    # --- episode outcome ---
+    phase: str
+    stress: str
+
     reward: float = 0.0
     steps: int = 0
-    # --- identity channels (all in [0, 1]) ---
+
     competence: float = 0.0
     coherence: float = 0.0
     continuity: float = 0.0
     integrity: float = 0.0
     meaning: float = 0.0
-    # --- composite ---
+
     identity: float = 0.0
     collapse_score: float = 0.0
     collapse: bool = False
-    # --- stress metadata ---
+
     stress_applied: int = 0
     violation: float = 0.0
     regret: float = 0.0
