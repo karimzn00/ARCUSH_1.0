@@ -1,19 +1,3 @@
-# arcus/core/identity.py
-"""
-Identity signal construction for ARCUS-H.
-
-Five channels -> one scalar identity in [0, 1]:
-  competence  : reward improvement relative to EMA baseline
-  coherence   : action smoothness (switch rate or jerk)
-  continuity  : local self-consistency vs previous episode
-  integrity   : fidelity to pre-phase anchor signature
-  meaning     : constraint respect + regret
-
-Channel weights are derived from baseline component variability (MAD-based)
-so that channels which barely move in normal conditions get more weight.
-
-NOTE: EpisodeLog and JSONL I/O live in arcus.core.logio — import from there.
-"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -23,10 +7,6 @@ import numpy as np
 
 ArrayLike = Union[np.ndarray, Iterable[float]]
 
-
-# ---------------------------------------------------------------------------
-# Numeric helpers
-# ---------------------------------------------------------------------------
 
 def _ff(x: Any, default: float = 0.0) -> float:
     try:
@@ -56,11 +36,6 @@ def _mad(x: np.ndarray) -> float:
         return 0.0
     med = float(np.median(x))
     return float(np.median(np.abs(x - med)))
-
-
-# ---------------------------------------------------------------------------
-# Weights
-# ---------------------------------------------------------------------------
 
 @dataclass
 class IdentityWeights:
@@ -130,14 +105,13 @@ def identity_weights_from_baseline_components(
     finite = mads[np.isfinite(mads)]
     med_mad = float(np.median(finite)) if finite.size else 0.0
 
-    # MAD floor: prevents constant channels from collapsing the whole weight vector
     mad_floor = float(max(1e-6, 0.25 * med_mad, 1e-3))
 
     mads = np.where(np.isfinite(mads), mads, med_mad)
     mads_eff = np.maximum(mads, mad_floor)
 
     inv = 1.0 / (mads_eff + 1e-12)
-    inv = np.sqrt(inv)          # gentle damping
+    inv = np.sqrt(inv)
     inv = inv / (float(np.sum(inv)) + 1e-12)
 
     return IdentityWeights(
@@ -147,11 +121,6 @@ def identity_weights_from_baseline_components(
         integrity =float(inv[3]),
         meaning   =float(inv[4]),
     ).normalize()
-
-
-# ---------------------------------------------------------------------------
-# Identity state (carries EMA and anchors across episodes)
-# ---------------------------------------------------------------------------
 
 @dataclass
 class IdentityState:
@@ -169,11 +138,6 @@ def update_reward_ema(state: IdentityState, episode_return: float) -> None:
     state.reward_ema = (1.0 - a) * cur + a * r
     if not np.isfinite(state.reward_ema):
         state.reward_ema = 0.0
-
-
-# ---------------------------------------------------------------------------
-# Channel functions
-# ---------------------------------------------------------------------------
 
 def competence_from_reward(
     episode_return: float,
@@ -193,14 +157,12 @@ def coherence_from_actions(actions: Iterable[Any]) -> float:
     try:
         a0 = np.asarray(acts[0])
         if a0.ndim == 0:
-            # Discrete
             arr = np.asarray(
                 [int(np.asarray(a).reshape(-1)[0]) for a in acts], dtype=np.int64
             )
             switch = float(np.mean(arr[1:] != arr[:-1])) if arr.size > 1 else 0.0
             return _clip01(1.0 - switch)
 
-        # Continuous: jerk-based
         arr = np.nan_to_num(
             np.asarray([np.asarray(a, dtype=np.float32).reshape(-1) for a in acts],
                        dtype=np.float32),
@@ -391,10 +353,6 @@ def identity_score(
     )
     return _clip01(s)
 
-
-# ---------------------------------------------------------------------------
-# High-level tracker
-# ---------------------------------------------------------------------------
 
 @dataclass
 class IdentityTracker:
