@@ -1,4 +1,3 @@
-# arcus/harness_rl/run_train.py
 from __future__ import annotations
 
 import argparse
@@ -11,9 +10,8 @@ import gymnasium as gym
 from stable_baselines3.common.env_util import make_vec_env, make_atari_env
 from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage, VecFrameStack
 
-# Optional (only used for procgen legacy gym)
 try:
-    import gym as old_gym  # type: ignore
+    import gym as old_gym
 except Exception:
     old_gym = None
 
@@ -23,7 +21,7 @@ def _ensure_atari_registered():
     Register ALE namespace so gymnasium can resolve "ALE/Pong-v5", etc.
     """
     try:
-        import ale_py  # type: ignore
+        import ale_py
         gym.register_envs(ale_py)
     except Exception:
         pass
@@ -34,7 +32,6 @@ def _is_image_obs(space: gym.spaces.Space) -> bool:
         return False
     if space.dtype is None:
         return False
-    # Atari obs are usually uint8 images (H,W,C) or (C,H,W)
     if len(space.shape) != 3:
         return False
     return True
@@ -47,7 +44,6 @@ def _auto_policy_for_env(env) -> str:
     obs_space = env.observation_space
     if _is_image_obs(obs_space):
         return "CnnPolicy"
-    # Multi-input dict obs
     if isinstance(obs_space, gym.spaces.Dict):
         return "MultiInputPolicy"
     return "MlpPolicy"
@@ -63,14 +59,12 @@ def _make_procgen_vec_env(env_id: str, seed: int, n_envs: int):
     """
     if old_gym is None:
         raise RuntimeError("Old gym is required for procgen but not installed/importable.")
-    import procgen  # noqa: F401
+    import procgen
 
-    from arcus.harness_rl.run_eval import GymOldToGymnasiumEnv  # reuse wrapper
+    from arcus.harness_rl.run_eval import GymOldToGymnasiumEnv 
 
     def _thunk():
         raw = old_gym.make(env_id)
-        # Unwrap PassiveEnvChecker / OrderEnforcing / EnvChecker that call
-        # np.bool8 (removed in NumPy 2.0).
         while hasattr(raw, 'env') and type(raw).__name__ in (
                 'OrderEnforcing', 'PassiveEnvChecker', 'EnvChecker'):
             raw = raw.env
@@ -83,22 +77,19 @@ def _make_env(env_id: str, seed: int, n_envs: int):
     """
     Central env factory.
     """
-    # Procgen
+
     if env_id.startswith("procgen:"):
         return _make_procgen_vec_env(env_id, seed=seed, n_envs=n_envs)
 
-    # Atari
+
     if env_id.startswith("ALE/"):
         _ensure_atari_registered()
-        # make_atari_env adds wrappers (NoFrameskip, episodic life, etc)
+
         venv = make_atari_env(env_id, n_envs=max(1, int(n_envs)), seed=seed)
-        # Stack frames for better learning
         venv = VecFrameStack(venv, n_stack=4)
-        # SB3 expects channel-first for CNN policies
         venv = VecTransposeImage(venv)
         return venv
 
-    # Default (gymnasium native)
     return make_vec_env(env_id, n_envs=max(1, int(n_envs)), seed=seed)
 
 
@@ -122,7 +113,6 @@ def _build_model(algo: str, env, *, device: str, tb_log: Optional[str], verbose:
         return A2C(**common)
 
     if algo == "dqn":
-        # DQN only works with Discrete action spaces
         if not isinstance(env.action_space, gym.spaces.Discrete):
             raise ValueError(f"DQN requires Discrete action space, got {env.action_space}")
         from stable_baselines3 import DQN
@@ -182,7 +172,6 @@ def main():
 
     model.learn(total_timesteps=int(args.timesteps))
 
-    # Save model
     env_safe = args.env.replace("/", "").replace(":", "_")
     zip_path = out_dir / f"{args.algo.lower()}_{env_safe}.zip"
     model.save(zip_path)
