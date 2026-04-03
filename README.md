@@ -15,7 +15,8 @@
 
 ---
 
-Standard RL benchmarks measure peak return under ideal conditions. ARCUS-H measures what happens when things go wrong.
+Standard RL benchmarks measure peak return under ideal conditions.  
+ARCUS-H measures what happens when things go wrong.
 
 Applied post-hoc to any Stable-Baselines3 policy — no retraining, no model internals — it runs a structured three-phase protocol (pre / shock / post) under eight realistic failure scenarios and decomposes behavioral stability into five interpretable channels.
 
@@ -25,48 +26,49 @@ Applied post-hoc to any Stable-Baselines3 policy — no retraining, no model int
 
 ### Finding 1: Reward explains only 3.7% of stability variance
 
-Across 51 (environment, algorithm) pairs, 12 environments, 8 algorithms, and 979,200 evaluation episodes, the primary correlation between ARCUS stability scores and normalized reward is:
+Across 51 (environment, algorithm) pairs, 12 environments, 8 algorithms, and 979,200 evaluation episodes:
 
-> **r = +0.192  [0.066, 0.310]  p = 2.13 × 10⁻³**  (n = 255 policy-level, n = 2550 seed-level)
+> **Primary Pearson r = +0.240  [0.111, 0.354]  p = 2.1 × 10⁻³**
+> (n = 255 policy-level · 2,550 seed-level · env stressors only · VI/RN excluded)
 
-R² = 0.037 → **96.3% of stability variance is unexplained by return.**
+R² = 0.057 → **94.3% of stability variance is unexplained by return.**
 
-This is not a claim that reward is wrong. It is a measurement that reward is incomplete: 87% of policies shift more than 10 rank positions between reward rankings and ARCUS stability rankings.
+**Note on the correlation number:** compare.py also outputs r = +0.311 for all 8 stressors including Valence Inversion (VI) and Reward Noise (RN). That number is inflated by circularity — VI/RN corrupt the reward signal, which is 15% of the ARCUS leaderboard score formula. The primary result is always r = +0.240.
 
-> **First-run pilot result (47 pairs, n=235):** r = 0.286 [0.149, 0.411]. The decrease to 0.192 in the full evaluation reflects a more diverse environment sample (SpaceInvaders and Walker2D added), which is scientifically correct. The CI narrowed by 69%, producing a more reliable estimate.
+An earlier pilot evaluation on 47 pairs gave r = 0.286 [0.149, 0.411] (n = 235). The decrease to 0.240 in the full evaluation reflects a more diverse sample (SpaceInvaders and Walker2d added), which is scientifically correct. The CI narrowed by 69%.
 
 ---
 
 ### Finding 2: SAC's entropy objective amplifies sensor fragility
 
-| Algorithm | Collapse rate under Observation Noise | Mechanism |
-|-----------|--------------------------------------|-----------|
-| **SAC** | **92.5%** | Entropy maximisation → high-entropy actions under noisy obs |
-| **TD3** | **61.0%** | Target action smoothing → implicit noise filter |
-| DDPG | 52.8% | — |
-| DQN | — | discrete only |
-| PPO | 41.0% | — |
+| Algorithm | Collapse rate under Observation Noise |
+|-----------|--------------------------------------|
+| **SAC** | **92.5%** |
+| **TD3** | **61.0%** |
+| DDPG | 52.8% |
+| PPO | 41.0% |
+| A2C | 25.8% |
 
 Same environments. Same training budget. Both off-policy actor-critic.
 
-SAC's entropy bonus — its strength for exploration — becomes a liability when observations are corrupted. TD3's deterministic policy gradient with target action smoothing acts as a natural noise filter. **This is invisible from return alone.**
+SAC's entropy maximization — its strength for exploration — amplifies sensitivity to observation noise. Each corrupted observation induces a high-entropy action response that accelerates behavioral collapse. TD3's deterministic policy gradient with target action smoothing acts as a natural noise filter.
 
-Replicated across the full 51-pair evaluation (first observed at 90.2% / 61.1% in the pilot run).
+**Replicated** across 51 pairs and 10 seeds (first observed at 90.2%/61.1% in pilot run on 47 pairs).
 
 ---
 
 ### Finding 3: CNN robustness is representation-dependent, not architecture-determined
 
 | Environment | ON collapse | Architecture |
-|------------|-------------|--------------|
+|-------------|-------------|--------------|
 | ALE/Pong-v5 | **41.9%** | AtariPreprocessing + FrameStack(4) CNN |
 | ALE/SpaceInvaders-v5 | **13.0%** | Identical architecture and wrapper |
 
-Same CNN. Same preprocessing. Same stressor calibration. **3.2× difference in fragility.**
+Same CNN. Same preprocessing. Same stressor calibration. **3× difference in fragility.**
 
-SpaceInvaders requires recognizing multiple enemy types, tracking movement patterns, and managing a firing mechanic — forcing distributed, compositional CNN representations. Pong's deflection task can be solved by tracking ball and paddle positions, producing localized representations that are more sensitive to per-pixel corruption.
+SpaceInvaders requires recognizing multiple enemy types, tracking movement patterns, and managing a firing mechanic — forcing the CNN to develop distributed, compositional representations. Pong's deflection task is solvable with localized object tracking. Different task complexity → different representation structure → different robustness to pixel noise.
 
-**Implication:** Researchers using Atari as a proxy for "CNN robustness" should not assume this generalizes across games. The robustness lives in the representation, not the architecture.
+**Implication:** You cannot infer a CNN policy's sensor robustness from its architecture. You have to measure it.
 
 ---
 
@@ -75,7 +77,7 @@ SpaceInvaders requires recognizing multiple enemy types, tracking movement patte
 | Suite | Mean collapse (env stressors) |
 |-------|-------------------------------|
 | MuJoCo (HalfCheetah + Hopper + **Walker2d**) | **78.6%** |
-| Continuous control (MCC + Pendulum) | 47.9% |
+| Continuous (MCC + Pendulum) | 47.9% |
 | Classic control | 47.8% |
 | Atari | 30.7% |
 
@@ -94,7 +96,6 @@ Walker2d-v4 (PPO + A2C, 3M steps, FPR = 0.053 — fully converged) confirms the 
 | Seeds per configuration | 10 |
 | Episodes per run | 120 (40/40/40) |
 | **Total evaluation episodes** | **979,200** |
-| Evaluation modes | Deterministic + Stochastic |
 
 ---
 
@@ -102,8 +103,8 @@ Walker2d-v4 (PPO + A2C, 3M steps, FPR = 0.053 — fully converged) confirms the 
 
 **Classic control:** CartPole-v1 · Acrobot-v1 · MountainCar-v0 · FrozenLake-v1 · LunarLander-v3  
 **Continuous control:** MountainCarContinuous-v0 · Pendulum-v1  
-**MuJoCo:** HalfCheetah-v4 · Hopper-v4 · **Walker2d-v4** *(new)*  
-**Atari (CNN):** ALE/Pong-v5 · **ALE/SpaceInvaders-v5** *(new)*
+**MuJoCo:** HalfCheetah-v4 · Hopper-v4 · Walker2d-v4  
+**Atari (CNN):** ALE/Pong-v5 · ALE/SpaceInvaders-v5
 
 **On-Policy:** PPO · A2C · TRPO  
 **Off-Policy AC:** SAC · TD3 · DDPG  
@@ -115,11 +116,8 @@ Walker2d-v4 (PPO + A2C, 3M steps, FPR = 0.053 — fully converged) confirms the 
 
 ```
 Policy π_θ  →  [PRE 40 eps]  →  [SHOCK 40 eps]  →  [POST 40 eps]
-                 Baseline          Stressor             Recovery
-                 fingerprint       applied              measured
-                    ↓                 ↓                    ↓
-               Calibrate          5 channels           Composite
-               threshold          measured             ARCUS score
+                Calibrate          Stressor             Recovery
+                threshold          applied              measured
 ```
 
 ### The 5 Behavioral Channels
@@ -128,7 +126,7 @@ Policy π_θ  →  [PRE 40 eps]  →  [SHOCK 40 eps]  →  [POST 40 eps]
 |---------|---------|-----------------|
 | Competence | Competence | Return vs pre-phase baseline |
 | Coherence | Policy Consistency | Action jitter / switch rate |
-| Continuity | Temporal Stability | Episode-to-episode behavioral change |
+| Continuity | Temporal Stability | Episode-to-episode change |
 | Integrity | Observation Reliability | Deviation from pre-phase anchor |
 | Meaning | Action Entropy Divergence | Goal-directed action structure |
 
@@ -141,33 +139,30 @@ Policy π_θ  →  [PRE 40 eps]  →  [SHOCK 40 eps]  →  [POST 40 eps]
 | CD | Concept Drift | Perception | Cumulative observation shift |
 | ON | Observation Noise | Perception | i.i.d. Gaussian sensor noise (15% σ) |
 | SB | Sensor Blackout | Perception | Contiguous zero-observation windows |
-| VI | Valence Inversion | Feedback | Reward sign flipped |
-| RN | Reward Noise | Feedback | Gaussian reward corruption |
+| VI | Valence Inversion | Feedback | Reward sign flipped *(excluded from primary analysis)* |
+| RN | Reward Noise | Feedback | Gaussian reward corruption *(excluded from primary analysis)* |
 
-*VI and RN are excluded from the primary correlation analysis to avoid circularity with the reward component of the ARCUS leaderboard score.*
+*VI and RN are excluded from the primary correlation to avoid circularity with the reward component of the ARCUS score.*
 
 ### ARCUS Leaderboard Score
 
 ```
-L = 0.55 · Ī  +  0.30 · (1 - CR_shock)  +  0.15 · r_norm
-      ↑                  ↑                       ↑
-  Stability score   Robustness            Task performance
+L = 0.55 · Ī  +  0.30 · (1 − CR_shock)  +  0.15 · r_norm
 ```
 
 ---
 
 ## Selected Results
 
-### Correlation: ARCUS vs Reward
+### Correlation Summary
 
-| Analysis | Pearson r | 95% CI | n |
-|----------|-----------|--------|---|
-| **Primary** (env stressors, reward-corrupting excluded) | **+0.192** | [0.066, 0.310] | 255 |
-| Spearman rank (env stressors) | +0.166 | [0.034, 0.299] | 255 |
-| Z-normed reward (env stressors) | +0.139 | [0.013, 0.257] | 255 |
-| Non-Atari (env stressors) | +0.189 | [0.051, 0.324] | 235 |
-| Atari only | +0.621 | [0.298, 0.878] | 20 |
-| Secondary (all stressors, incl VI/RN) | +0.247 | [0.149, 0.349] | 357 |
+| Analysis | r | 95% CI | n |
+|----------|---|--------|---|
+| **Primary** (env stressors only) | **+0.240** | [0.111, 0.354] | 255 |
+| Spearman rank | +0.180 | [0.034, 0.299] | 255 |
+| Per-env z-normed | +0.234 | [0.013, 0.257] | 255 |
+| Non-Atari subset | +0.189 | [0.051, 0.324] | 235 |
+| All stressors incl VI/RN *(secondary)* | +0.311 | [0.152, 0.351] | 357 |
 
 ### Policy Degeneracy Rate by Stressor
 
@@ -181,68 +176,47 @@ L = 0.55 · Ī  +  0.30 · (1 - CR_shock)  +  0.15 · r_norm
 | Concept Drift (CD) | 56.4% |
 | Observation Noise (ON) | 42.1% |
 
-*excluded from primary correlation
-
-### Top and Bottom Stable Policies
-
-**Most stable (env stressors):**
-1. ALE/SpaceInvaders-v5 / A2C — 0.817 ← *new finding*
-2. MountainCarContinuous-v0 / TD3 — 0.737
-3. Acrobot-v1 / PPO — 0.731
-
-**Least stable (env stressors):**
-1. HalfCheetah-v4 / PPO — 0.362
-2. HalfCheetah-v4 / TRPO — 0.383
-3. HalfCheetah-v4 / TD3 — 0.386
-
-SpaceInvaders/A2C topping the leaderboard is the direct result of Finding 3: its CNN representations are highly robust to all five env stressors despite not achieving the highest raw reward.
+*Feedback-axis stressors excluded from primary correlation.
 
 ---
 
 ## Plots
 
-All plots are generated by `compare.py v4.0`. The following were produced in earlier evaluations and remain available in the repo:
-
-![Degeneracy Heatmap](runs/plots/fig02_degeneracy_heatmap.png)
-*Policy degeneracy rate by algorithm and stressor.*
-
 ![Suite Collapse](runs/plots/fig03_suite_collapse.png)
-*Collapse rates by environment suite and stressor.*
+*Policy degeneracy by suite and stressor.*
 
-![ARCUS vs Reward](runs/plots/fig04_arcus_vs_reward.png)
-*Primary correlation scatter (env stressors, left) and secondary (right).*
+![Correlation](runs/plots/fig04_correlation_scatter.png)
+*Primary (left) and secondary (right) correlation scatter. Use left panel for citations.*
 
-![SAC vs TD3](runs/plots/fig08_sac_td3_on.png)
+![SAC vs TD3](runs/plots/fig07_sac_td3_on.png)
 *SAC 92.5% vs TD3 61.0% under observation noise.*
 
-![Atari Comparison](runs/plots/fig15_atari_comparison.png)
-*SpaceInvaders (13% ON) vs Pong (42% ON) — same architecture, different robustness.*
+![Atari](runs/plots/fig14_atari_comparison.png)
+*SpaceInvaders (13%) vs Pong (42%) under identical CNN and stressor.*
 
-![Walker2D](runs/plots/fig14_walker2d.png)
-*Walker2d-v4 breakdown — MuJoCo fragility confirmed on third locomotion env.*
+![Radar](runs/plots/fig09_radar_channels.png)
+*Per-channel degradation by stressor. Policy Consistency shown as 0 where stressor improved it.*
 
-![Score Density](runs/plots/fig20_score_density_suite.png)
-*ARCUS score distribution density by suite — MuJoCo lowest despite highest return.*
+![Score Density](runs/plots/fig19_score_density.png)
+*ARCUS score distribution by suite — MuJoCo lowest despite highest return.*
 
-![Channel Drop Density](runs/plots/fig21_channel_drop_density.png)
-*Per-channel behavioral degradation density by stressor.*
+![Channel Density](runs/plots/fig20_channel_drop_density.png)
+*Per-channel degradation density — validates five-channel decomposition as non-redundant.*
+
+![Atari Density](runs/plots/fig24_atari_density.png)
+*SpaceInvaders dense near 0 under ON; Pong broader and higher.*
 
 ---
 
 ## Quickstart
-
-### Installation
 
 ```bash
 git clone https://github.com/karimzn00/ARCUSH
 cd ARCUSH
 pip install -e .
 pip install stable-baselines3 sb3-contrib gymnasium ale-py
-```
 
-### Run evaluation on your model
-
-```bash
+# Run evaluation
 python -m arcus.harness_rl.run_eval \
     --run_dir path/to/your/model \
     --env CartPole-v1 \
@@ -252,27 +226,13 @@ python -m arcus.harness_rl.run_eval \
     --both \
     --save_per_episode \
     --resume
-```
 
-For Atari environments (adds obs-normalization for stressor symmetry):
-```bash
-python -m arcus.harness_rl.run_eval \
-    --run_dir path/to/atari/model \
-    --env ALE/Pong-v5 \
-    --algo ppo \
-    --seeds 0-4 \
-    --episodes 120 \
-    --both \
-    --obs_normalize
-```
-
-### Generate analysis and plots
-
-```bash
+# Generate all plots (25 paper figures + 7 social media)
 python -m arcus.harness_rl.compare \
     --leaderboard runs/leaderboard.csv \
+    --per_episode runs/per_episode.csv \
     --plots_dir   runs/plots \
-    --plots --print --write_csv
+    --plots --social --print --write_csv
 ```
 
 ### Key flags
@@ -281,11 +241,10 @@ python -m arcus.harness_rl.compare \
 |------|---------|-------------|
 | `--seeds` | `0` | e.g. `0-9` for 10 seeds |
 | `--episodes` | `120` | Total episodes (40/40/40 split) |
-| `--both` | off | Evaluate both det + stochastic modes |
-| `--resume` | off | Skip completed runs (safe to restart) |
-| `--obs_normalize` | off | Running mean-std obs normalization (use for Atari) |
+| `--both` | off | Evaluate det + stochastic modes |
+| `--resume` | off | Skip completed runs |
+| `--obs_normalize` | off | Running mean-std normalization (use for Atari) |
 | `--fpr_target` | `0.05` | Adaptive threshold target FPR |
-| `--save_per_episode` | on | Save per-episode CSV for density analysis |
 
 ---
 
@@ -299,18 +258,17 @@ arcus/
     meaning_proxy.py     PCA-whitened joint entropy proxy (v2.0)
   harness_rl/
     run_eval.py          Main eval harness (v1.4, patches 1-17)
-    compare.py           Analysis suite (v4.0, 25 figures, 4 tables)
+    compare.py           Analysis suite (v4.2, 25 figures, 5 tables)
     stressors/
       __init__.py        All 8 stressors registered
       base.py            StressPatternWrapper
-      observation_noise.py  ON stressor
-      sensor_blackout.py    SB stressor
-      reward_noise.py       RN stressor
-      concept_drift.py      CD stressor
-      trust_violation.py    TV stressor
-      resource_constraint.py RC stressor
-      valence_inversion.py  VI stressor
-run_eval_all.sh
+      observation_noise.py
+      sensor_blackout.py
+      reward_noise.py
+      concept_drift.py
+      trust_violation.py
+      resource_constraint.py
+      valence_inversion.py
 ```
 
 ---
@@ -330,15 +288,9 @@ run_eval_all.sh
 
 ---
 
-## License
-
-MIT License. See [LICENSE](LICENSE).
-
----
-
 <div align="center">
 <strong>NurAQL Research Laboratory</strong><br>
-<a href="https://nuraql.com">nuraql.com</a> · 
-<a href="https://github.com/karimzn00">github.com/karimzn00</a> · 
+<a href="https://nuraql.com">nuraql.com</a> ·
+<a href="https://github.com/karimzn00">github.com/karimzn00</a> ·
 <a href="mailto:karim.zinebiof@gmail.com">karim.zinebiof@gmail.com</a>
 </div>
