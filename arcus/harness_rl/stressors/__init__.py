@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from typing import Any, Dict, Type
 
 from .base import apply_stress_pattern, BaseStressor
@@ -8,7 +7,9 @@ from .resource_constraint import ResourceConstraintStressor
 from .trust_violation import TrustViolationStressor, TrustViolationConfig
 from .valence_inversion import ValenceInversionStressor
 from .concept_drift import ConceptDriftStressor, ConceptDriftConfig
-
+from .observation_noise import ObservationNoiseStressor
+from .sensor_blackout import SensorBlackoutStressor
+from .reward_noise import RewardNoiseStressor
 
 _REGISTRY: Dict[str, tuple[Type[BaseStressor], bool]] = {
     "none":                (BaselineStressor,          False),
@@ -17,10 +18,14 @@ _REGISTRY: Dict[str, tuple[Type[BaseStressor], bool]] = {
     "trust_violation":     (TrustViolationStressor,     True),
     "valence_inversion":   (ValenceInversionStressor,   False),
     "concept_drift":       (ConceptDriftStressor,       True),
+    "observation_noise":   (ObservationNoiseStressor,   True),
+    "sensor_blackout":     (SensorBlackoutStressor,     True),
+    "reward_noise":        (RewardNoiseStressor,        True),
 }
 
 
 def available_stressors() -> list[str]:
+    """Return sorted list of registered stressor names."""
     return sorted(_REGISTRY.keys())
 
 
@@ -32,5 +37,5 @@ def get_stressor(name: str, *, seed: int = 0, **kwargs: Any) -> BaseStressor:
         )
     cls, accepts_seed = _REGISTRY[key]
     if accepts_seed:
-        return cls(seed=int(seed), **kwargs)    # type: ignore[call-arg]
-    return cls(**kwargs)                        # type: ignore[call-arg]
+        return cls(seed=int(seed), **kwargs)
+    return cls(**kwargs)
