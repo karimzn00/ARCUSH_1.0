@@ -1,4 +1,3 @@
-# arcus/harness_rl/stressors/baseline.py
 from __future__ import annotations
 
 from typing import Any, Dict, Tuple
@@ -8,7 +7,6 @@ from .base import BaseStressor
 
 
 class BaselineStressor(BaseStressor):
-    """No-op stressor. Used in pre and post phases."""
     name = "baseline"
 
     def transform_step(
